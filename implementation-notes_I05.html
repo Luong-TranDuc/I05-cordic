@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>I05 — Bộ tính sin và cos bằng CORDIC 8-bit · Ghi chú thực hiện</title>
+<style>
+:root{
+  --bg:#ffffff; --fg:#1a1d21; --muted:#5c6570; --line:#e3e7eb;
+  --accent:#1f5fa9; --accent-soft:#eef4fb; --code-bg:#f5f7f9;
+  --ok:#137a4d; --ok-bg:#e8f6ee; --warn:#8a5a00; --warn-bg:#fdf4e2;
+  --bad:#a52020; --bad-bg:#fceded; --open:#7a5ba8; --open-bg:#f3eefa;
+  --maxw:960px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15181c; --fg:#e6e9ec; --muted:#98a2ad; --line:#2a2f36;
+    --accent:#6fa8e0; --accent-soft:#1c2733; --code-bg:#1b1f24;
+    --ok:#5cc08d; --ok-bg:#16291f; --warn:#d8a54a; --warn-bg:#2a2314;
+    --bad:#e88b8b; --bad-bg:#2b1a1a; --open:#b79ad6; --open-bg:#241d2e;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15181c; --fg:#e6e9ec; --muted:#98a2ad; --line:#2a2f36;
+  --accent:#6fa8e0; --accent-soft:#1c2733; --code-bg:#1b1f24;
+  --ok:#5cc08d; --ok-bg:#16291f; --warn:#d8a54a; --warn-bg:#2a2314;
+  --bad:#e88b8b; --bad-bg:#2b1a1a; --open:#b79ad6; --open-bg:#241d2e;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0; background:var(--bg); color:var(--fg);
+  font:16px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  -webkit-text-size-adjust:100%;
+}
+.wrap{max-width:var(--maxw); margin:0 auto; padding:0 16px 96px}
+header.doc{
+  border-bottom:1px solid var(--line); margin-bottom:28px; padding:36px 0 22px;
+}
+header.doc .eyebrow{
+  font-size:12px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--muted); font-weight:600; margin-bottom:10px;
+}
+header.doc h1{font-size:clamp(24px,4.4vw,34px); line-height:1.25; margin:0 0 14px}
+.badges{display:flex; flex-wrap:wrap; gap:7px; margin-top:6px}
+.badge{
+  font-size:12.5px; padding:3px 10px; border-radius:999px;
+  border:1px solid var(--line); color:var(--muted); background:var(--accent-soft);
+  white-space:nowrap;
+}
+.badge.ok{color:var(--ok); background:var(--ok-bg); border-color:transparent}
+.badge.warn{color:var(--warn); background:var(--warn-bg); border-color:transparent}
+.badge.bad{color:var(--bad); background:var(--bad-bg); border-color:transparent}
+.badge.open{color:var(--open); background:var(--open-bg); border-color:transparent}
+nav.toc{
+  border:1px solid var(--line); border-radius:10px; padding:16px 20px;
+  margin:0 0 32px; background:var(--accent-soft);
+}
+nav.toc p{margin:0 0 8px; font-weight:700; font-size:13px; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--muted)}
+nav.toc ul{margin:0; padding-left:20px}
+nav.toc li{margin:3px 0}
+nav.toc a{color:var(--fg); text-decoration:none}
+nav.toc a:hover{color:var(--accent); text-decoration:underline}
+nav.toc ul ul{padding-left:18px; font-size:14.5px}
+h2{font-size:22px; margin:40px 0 12px; padding-bottom:6px; border-bottom:1px solid var(--line)}
+h3{font-size:18px; margin:28px 0 8px}
+h4{font-size:16px; margin:22px 0 6px; color:var(--muted)}
+p{margin:12px 0}
+a{color:var(--accent)}
+ul,ol{padding-left:24px}
+li{margin:4px 0}
+code{
+  font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  font-size:.9em; background:var(--code-bg); padding:1.5px 5px; border-radius:4px;
+}
+pre{
+  background:var(--code-bg); border:1px solid var(--line); border-radius:8px;
+  padding:14px 16px; overflow-x:auto; line-height:1.55; font-size:13.5px;
+}
+pre code{background:none; padding:0; font-size:inherit}
+blockquote{
+  margin:16px 0; padding:2px 18px; border-left:3px solid var(--accent);
+  background:var(--accent-soft); border-radius:0 8px 8px 0; color:var(--fg);
+}
+blockquote p{margin:10px 0}
+.tablewrap{overflow-x:auto; margin:16px 0; -webkit-overflow-scrolling:touch}
+table{border-collapse:collapse; width:100%; font-size:14.5px; min-width:420px}
+th,td{border:1px solid var(--line); padding:7px 11px; text-align:left; vertical-align:top}
+th{background:var(--accent-soft); font-weight:650; white-space:nowrap}
+tbody tr:nth-child(even) td{background:color-mix(in srgb, var(--code-bg) 55%, transparent)}
+hr{border:0; border-top:1px solid var(--line); margin:34px 0}
+footer.doc{
+  margin-top:56px; padding-top:18px; border-top:1px solid var(--line);
+  color:var(--muted); font-size:13.5px;
+}
+.themebtn{
+  position:fixed; right:14px; bottom:14px; z-index:10;
+  border:1px solid var(--line); background:var(--bg); color:var(--muted);
+  border-radius:999px; padding:8px 14px; font-size:13px; cursor:pointer;
+}
+.themebtn:hover{color:var(--fg)}
+@media (max-width:640px){
+  .wrap{padding:0 16px 72px}
+  header.doc{padding:26px 0 18px}
+  nav.toc{padding:14px 16px}
+}
+@media print{
+  .themebtn{display:none}
+  nav.toc{break-inside:avoid}
+  pre,table,blockquote{break-inside:avoid}
+  body{font-size:11pt}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="doc">
+  <div class="eyebrow">RTL2GDS · Đề I05 · Ghi chú thực hiện</div>
+  <h1>I05 — Bộ tính sin và cos bằng CORDIC 8-bit · Ghi chú thực hiện</h1>
+  <div class="badges"><span class="badge ">I · Số học nâng cao</span><span class="badge ">Độ khó: Trung bình</span><span class="badge ">Loại mạch: Tuần tự</span><span class="badge ok">Mô phỏng: PASS</span><span class="badge ">Tổng hợp: 864 cell · 66 FF</span><span class="badge ">Đường tới hạn: 11,15 ns</span><span class="badge warn">Physical design: CHƯA CHẠY</span></div>
+</header>
+<nav class="toc"><p>Mục lục</p><ul><li><a href="#1-bai-toan-nay-thuc-chat-la-gi">1. Bài toán này thực chất là gì</a></li><li><a href="#2-ban-chat-ky-thuat-co-che-hoat-dong">2. Bản chất kỹ thuật — cơ chế hoạt động</a></li><li><a href="#3-doc-ma-nguon-rtl-lam-gi-tung-dong-quan-trong">3. Đọc mã nguồn: RTL làm gì, từng dòng quan trọng</a></li><li><a href="#4-vi-sao-chon-kien-truc-nay">4. Vì sao chọn kiến trúc này</a></li><li><a href="#5-cach-thuc-hien-lo-trinh-8-buoc-tu-dac-ta-toi-gdsii">5. Cách thực hiện — lộ trình 8 bước từ đặc tả tới GDSII</a></li><li><a href="#6-so-lieu-that-da-do-duoc-va-cach-doc-chung">6. Số liệu thật đã đo được và cách đọc chúng</a></li><li><a href="#7-tra-loi-cac-cau-hoi-ky-thuat-cua-charter-muc-2">7. Trả lời các câu hỏi kỹ thuật của Charter (mục 2)</a></li><li><a href="#8-tra-loi-cau-phan-tich-rieng-charter-muc-9">8. Trả lời câu phân tích riêng (Charter mục 9)</a></li><li><a href="#9-nhung-cho-sinh-vien-hay-sai-va-cach-phat-hien">9. Những chỗ sinh viên hay sai và cách phát hiện</a></li><li><a href="#10-cau-hoi-mentor-nen-dat-khi-bao-ve">10. Câu hỏi mentor nên đặt khi bảo vệ</a></li><li><a href="#11-gioi-han-da-chung-minh-duoc-gi-chua-chung-minh-duoc-gi">11. Giới hạn: đã chứng minh được gì, chưa chứng minh được gì</a></li></ul></nav>
+<main>
+<blockquote>
+<p>🟡 <strong>Tóm tắt trạng thái:</strong> khối <strong>đúng chức năng</strong> (<code>I05 RTL TB PASS</code>) nhưng <strong>không đạt
+ràng buộc thời gian giả định</strong> (WNS <strong>−1,27 ns</strong>, TNS <strong>−13,36 ns</strong>) và <strong>vượt 80 %</strong> quy
+mô cell mà Charter dự đoán (864 so với 350–480). Đây là đề duy nhất trong nhóm I có slack
+âm — và nguyên nhân đã được truy ra tới <strong>một dòng mã</strong> (§2, §8).</p>
+</blockquote>
+<h2 id="1-bai-toan-nay-thuc-chat-la-gi">1. Bài toán này thực chất là gì</h2>
+<p>Charter mục 1 nêu: <em>“Khối tính sin/cos để tạo dạng sóng trong bộ phát tín hiệu thử, không
+dùng bảng tra lớn.”</em> Vế sau mới là đề bài thật.</p>
+<p>Tính <code>sin</code> và <code>cos</code> cho 256 góc rời rạc là chuyện <strong>tầm thường</strong> nếu được dùng bảng tra:
+hai mảng 256 × 8 bit là xong, sai số bằng 0, độ trễ một chu kỳ. Nhưng 4096 bit hằng số
+trên một ô Tiny Tapeout — nơi <strong>không có macro ROM</strong> — phải trở thành logic tổ hợp, và nó
+sẽ rất đắt.</p>
+<p>Vậy đề này hỏi: <strong>có cách nào tính lượng giác mà chỉ cần 80 bit hằng số không?</strong> CORDIC trả
+lời: có — nếu chấp nhận <strong>8 chu kỳ</strong> và <strong>sai số tới ≈ 4 %</strong>. Ba con số <code>80 bit / 8 chu kỳ /
+4 %</code> là toàn bộ nội dung của đề, và Charter mục 10 nhấn mạnh rằng con số thứ ba <strong>phải
+được đo và công bố</strong>, không được giấu.</p>
+<p>Điều làm đề này khó nhất nhóm I không phải thuật toán, mà là ở chỗ: kết quả <strong>luôn sai</strong>,
+nên không thể dùng phép so bằng để kiểm — phải lập bảng sai số, phải giải thích sai số đến
+từ đâu, và phải biết sai số nào là <strong>cố hữu</strong> còn sai số nào là <strong>sửa được</strong>.</p>
+<h2 id="2-ban-chat-ky-thuat-co-che-hoat-dong">2. Bản chất kỹ thuật — cơ chế hoạt động</h2>
+<p>CORDIC dựa trên một quan sát: phép <strong>quay</strong> vector</p>
+<pre><code>   x' = x·cos φ − y·sin φ
+   y' = y·cos φ + x·sin φ
+</code></pre>
+<p>nếu chọn <code>φ</code> sao cho <code>tan φ = 2^(−i)</code>, có thể viết lại thành</p>
+<pre><code>   x' = cos φ · (x − y·2^(−i))
+   y' = cos φ · (y + x·2^(−i))
+</code></pre>
+<p>Nhân với <code>2^(−i)</code> là <strong>phép dịch</strong>. Còn hệ số <code>cos φ</code> thì <strong>không phụ thuộc chiều quay</strong>,
+nên nó tích luỹ thành một hằng số <code>K₈ ≈ 1,6467</code> sau 8 vòng và được <strong>bù trước</strong> bằng cách
+khởi tạo <code>x = round(2^14 / K₈) = 9949</code>. Đó là trọn vẹn cơ chế: <strong>bỏ phép nhân, giữ lại phép
+dịch và phép cộng</strong>, còn hệ số khuếch đại thì trả một lần ở đầu.</p>
+<p>Mỗi vòng ta chọn quay <strong>cùng chiều</strong> hay <strong>ngược chiều</strong> tuỳ theo góc dư <code>z</code> còn dương hay
+âm — đây là một tìm kiếm nhị phân trên góc. Sau 8 vòng, <code>z → 0</code> và vector đã quay đúng góc
+cần.</p>
+<p>Nhưng có <strong>hai nút thắt</strong>, và cả hai đều không nằm ở chỗ người ta thường nghĩ.</p>
+<p><strong>Nút thắt thứ nhất — sai số không đến từ “chỉ có 8 vòng”, mà từ bảng arctan bị làm tròn.</strong>
+Bảng trong RTL là <code>[32, 19, 10, 5, 3, 1, 1, 0]</code>. Hai mục cuối là <code>1</code> và <code>0</code>, trong khi giá
+trị thật là <code>0,64</code> và <code>0,32</code>. Nghĩa là hai vòng cuối quay <strong>sai lượng</strong>, và vòng thứ 8
+không hiệu chỉnh góc chút nào (<code>atan[7] = 0</code>). Bằng chứng nhìn thấy trực tiếp trên
+waveform: ở <code>angle = 32</code>, kết quả sau <strong>vòng 6</strong> (<code>x/2^14 = 0,7065</code>, <code>y/2^14 = 0,7075</code>)
+<strong>chính xác hơn</strong> kết quả sau <strong>vòng 8</strong> (<code>0,7010 / 0,7131</code>). <strong>Hai vòng cuối làm kết quả
+tệ đi.</strong> Hệ quả thực hành: tăng số vòng lên 10 hay 12 mà giữ nguyên bảng sẽ <strong>không</strong> cải
+thiện gì — phải tăng độ rộng của <code>z</code> và của bảng trước.</p>
+<p><strong>Nút thắt thứ hai — đường tới hạn không nằm trong vòng lặp.</strong> Nó nằm ở đường <strong>thoát ra</strong>:
+<code>count → bộ dịch biến thiên → bộ cộng 16-bit → quantize_q14 → sin_out</code>, và đoạn
+<code>quantize_q14</code> (làm tròn + <strong>bão hoà</strong>) chiếm <strong>35 %</strong> của 11,15 ns. Đoạn này chỉ chạy
+<strong>một lần trong 10 chu kỳ</strong>, nhưng nó quyết định chu kỳ clock của <strong>toàn bộ</strong> thiết kế.
+Thêm nữa, <code>count[0]</code> có fanout <strong>42</strong> (nó lái hai bộ dịch biến thiên 16 bit), slew
+<strong>1,69 ns</strong>, độ trễ clk→Q <strong>1,45 ns</strong> — <strong>13 %</strong> ngân sách, chỉ từ một flip-flop.</p>
+<h2 id="3-doc-ma-nguon-rtl-lam-gi-tung-dong-quan-trong">3. Đọc mã nguồn: RTL làm gì, từng dòng quan trọng</h2>
+<p>Trái tim thuật toán, dòng 92–100:</p>
+<pre><code class="language-systemverilog">if (z_reg &gt;= 0) begin
+    x_next = x_reg - (y_reg &gt;&gt;&gt; count);
+    y_next = y_reg + (x_reg &gt;&gt;&gt; count);
+    z_next = z_reg - atan_const(count[2:0]);
+end else begin
+    x_next = x_reg + (y_reg &gt;&gt;&gt; count);
+    y_next = y_reg - (x_reg &gt;&gt;&gt; count);
+    z_next = z_reg + atan_const(count[2:0]);
+end
+</code></pre>
+<p><strong>Ba điểm phải thấy:</strong></p>
+<ol>
+<li><strong>Cả hai dòng đều đọc <code>x_reg</code>, không đọc <code>x_next</code>.</strong> Nếu viết nhầm
+   <code>y_next = y_reg + (x_next &gt;&gt;&gt; count)</code> thì thuật toán sai <strong>và</strong> hai bộ cộng bị nối tiếp
+   — đường tới hạn gấp đôi. RTL làm đúng.</li>
+<li><strong><code>&gt;&gt;&gt; count</code> là bộ dịch BIẾN THIÊN.</strong> Ở I03/I04 lượng dịch luôn là 1 nên tốn <strong>0 cell</strong>;
+   ở đây nó là 77 cell MUX. Đây là điểm đánh đổi <strong>không hiển nhiên</strong> của việc lặp trong
+   CORDIC.</li>
+<li><strong><code>z_reg &gt;= 0</code> chỉ là bit dấu <code>z_reg[9]</code></strong> — một tín hiệu điều khiển gần như miễn phí,
+   nhưng nó lái cả 42 bit dữ liệu.</li>
+</ol>
+<p>Khâu gây slack âm, dòng 136–146:</p>
+<pre><code class="language-systemverilog">if (count == 4'd7) begin
+    cos_out &lt;= sign_cos ? -quantize_q14(x_next) : quantize_q14(x_next);
+    sin_out &lt;= sign_sin ? -quantize_q14(y_next) : quantize_q14(y_next);
+</code></pre>
+<p><code>x_next</code> và <code>y_next</code> là <strong>tín hiệu tổ hợp</strong> — chúng vừa ra khỏi bộ cộng 16-bit trong <strong>cùng
+chu kỳ</strong>. Áp thêm <code>quantize_q14</code> (một phép cộng nhỏ, một phép dịch, <strong>hai phép so sánh bão
+hoà</strong>) và một phép đổi dấu lên chúng nghĩa là nối thêm ≈ 3,88 ns vào một đường vốn đã dài
+7,27 ns. Bản chú thích ngay trên đó nói rõ ý định — <em>“sign restoration and output
+quantization use the post-iteration values”</em> — nhưng đó chính là lựa chọn phải trả giá.</p>
+<p>Hàm lượng tử hoá, dòng 52–58:</p>
+<pre><code class="language-systemverilog">if (v &gt;= 0) scaled = v + 32'sd64;
+else        scaled = v - 32'sd64;
+q = scaled &gt;&gt;&gt; 7;
+</code></pre>
+<p>Ý đồ là “làm tròn về số gần nhất”: cộng nửa đơn vị rồi cắt. Nhưng <code>&gt;&gt;&gt;</code> là <strong>dịch số học</strong>
+= <code>floor</code>, chứ không phải cắt-về-0. Với <code>v &lt; 0</code>, <code>floor((v−64)/128)</code> <strong>lệch một mã xuống</strong>
+so với làm tròn đúng. Ví dụ <code>v = −138</code> (chính là <code>y</code> cuối cùng của <code>angle = 0</code>): RTL cho
+<code>−2</code>, làm tròn đúng cho <code>−1</code>. Đây là nguyên nhân khiến RTL và mô hình chuẩn <strong>không
+bit-exact</strong> ở 16/256 góc (<code>corner_cases.md</code> §6.2) — dung sai <code>±4</code> của testbench che mất nó.</p>
+<p>Cuối cùng, dòng 74–90 (gập góc) sinh <code>sign_cos</code>/<code>sign_sin</code> <strong>tổ hợp thuần từ <code>angle</code></strong>,
+nhưng chúng lại được dùng ở <code>C8</code> — <strong>8 chu kỳ sau</strong>. Ràng buộc ngầm: <code>angle</code> phải ổn định
+suốt 9 chu kỳ, không chỉ tại <code>C0</code>. Không có tài liệu nào trong hồ sơ nói điều này trước khi
+<code>control.md</code> §4 chỉ ra.</p>
+<h2 id="4-vi-sao-chon-kien-truc-nay">4. Vì sao chọn kiến trúc này</h2>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>Tiêu chí của ứng dụng</th>
+<th>CORDIC lặp đáp ứng?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Không dùng bảng tra lớn</strong></td>
+<td>✅ 80 bit hằng so với 4096 bit — tỉ lệ <strong>1 : 51</strong></td>
+</tr>
+<tr>
+<td>Không cần phép nhân</td>
+<td>✅ Xác nhận trên netlist: <strong>0</strong> cell nhân, <strong>0</strong> macro bộ nhớ</td>
+</tr>
+<tr>
+<td>Độ trễ cố định, không phụ thuộc dữ liệu</td>
+<td>✅ 10 chu kỳ cho mọi góc ⟹ DDS không bị jitter</td>
+</tr>
+<tr>
+<td>Diện tích nhỏ</td>
+<td>⚠️ <strong>864 cell, vượt 80 %</strong> dự đoán; lớn hơn <strong>2,4 lần</strong> một bộ nhân tuần tự trọn vẹn</td>
+</tr>
+<tr>
+<td>Đạt chu kỳ 10 ns</td>
+<td>🟥 <strong>Không</strong> — WNS −1,27 ns</td>
+</tr>
+<tr>
+<td>Sai số chấp nhận được</td>
+<td>⚠️ tới <strong>5 mã / 128 ≈ 3,9 %</strong> — phải công bố, không giấu</td>
+</tr>
+</tbody>
+</table></div>
+<p>Cần nói thẳng: <strong>hai trong sáu tiêu chí không đạt.</strong> Điều đó không làm kiến trúc sai — nó
+làm <strong>hiện thực</strong> cần sửa. Cả hai chỗ không đạt đều truy được về nguyên nhân cụ thể và cả
+hai đều có hướng sửa chi phí thấp (§8, §10).</p>
+<h2 id="5-cach-thuc-hien-lo-trinh-8-buoc-tu-dac-ta-toi-gdsii">5. Cách thực hiện — lộ trình 8 bước từ đặc tả tới GDSII</h2>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>Bước</th>
+<th>Việc</th>
+<th>Đầu ra</th>
+<th>Trạng thái</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Chốt định dạng số (Q1.14 nội bộ, Q0.7 ra) và tính <code>X_INIT</code>, bảng arctan <strong>trước</strong> khi viết RTL</td>
+<td><code>functional_spec.md</code> §2–§3</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Mô hình chuẩn Python; kiểm <code>X_INIT == 9949</code>, <code>ATAN == [32,19,10,5,3,1,1,0]</code></td>
+<td><code>test_constants</code></td>
+<td>✅ <strong>PASS</strong></td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Lập bảng sai số trên mô hình chuẩn trước khi viết RTL</strong> — để biết mức sai số nào là cố hữu</td>
+<td><code>error_table()</code>, <code>test_error_bounds</code></td>
+<td>✅ max 5 / 4</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Viết RTL, cấm <code>*</code> và cấm bảng tra</td>
+<td><code>i05_cordic_core.sv</code></td>
+<td>✅</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Testbench với <strong>dung sai</strong> (không so bằng)</td>
+<td><code>simulation.log</code>: <code>I05 RTL TB PASS</code></td>
+<td>✅ 6 góc, ±4</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>Quét đủ 256 góc trên RTL và so từng bit với mô hình chuẩn</strong></td>
+<td>bảng sai số của RTL</td>
+<td>⬜ <strong>chưa làm</strong></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Tổng hợp + STA, <strong>đọc đường tới hạn theo tên net</strong></td>
+<td>864 cell · WNS −1,27 ns</td>
+<td>✅ chạy · 🟥 không đạt</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Sửa kiến trúc theo §10, chạy lại, rồi P&amp;R</td>
+<td></td>
+<td>⬜ chưa làm</td>
+</tr>
+</tbody>
+</table></div>
+<p>Bước 3 là điểm đáng học của quy trình này: <strong>lập bảng sai số trên mô hình chuẩn TRƯỚC</strong>,
+để khi RTL cho kết quả lệch vài mã thì ta biết đó là sai số <strong>thuật toán</strong> (chấp nhận được)
+hay sai số <strong>hiện thực</strong> (phải sửa).</p>
+<h2 id="6-so-lieu-that-da-do-duoc-va-cach-doc-chung">6. Số liệu thật đã đo được và cách đọc chúng</h2>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>Chỉ số</th>
+<th style="text-align: right;">Giá trị</th>
+<th>Chứng minh gì</th>
+<th><strong>Không</strong> chứng minh gì</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>I05 RTL TB PASS</code></td>
+<td style="text-align: right;"><code>simulation.log</code></td>
+<td>Đúng ở <strong>6 góc</strong> với dung sai ±4</td>
+<td><strong>Không</strong> nói gì về 250 góc còn lại</td>
+</tr>
+<tr>
+<td><code>max sine error: 5</code>, <code>max cosine error: 4</code></td>
+<td style="text-align: right;"><code>python_reference_run.log</code></td>
+<td>Sai số của <strong>mô hình chuẩn</strong> trên đủ 256 góc</td>
+<td><strong>Không</strong> phải sai số của RTL — hai bên lệch ở 16/256 góc</td>
+</tr>
+<tr>
+<td><strong>864 cell</strong></td>
+<td style="text-align: right;"><code>synth_stat.txt</code></td>
+<td><strong>Vượt 80 %</strong> dải Charter (350–480) ⟹ có thể cần 2×1 tile</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>66 FF</strong></td>
+<td style="text-align: right;"><code>synth_stat.txt</code></td>
+<td>Khớp chính xác <code>32 + 10 + 16 + 4 + 2 + 2</code>; hơn <strong>gấp đôi</strong> dự đoán 27–30</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>77 cell MUX</strong></td>
+<td style="text-align: right;">bảng phân bố cell</td>
+<td>Bộ dịch <strong>biến thiên</strong> — chi phí riêng của việc <strong>lặp</strong> CORDIC</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>40 <code>maj3_1</code></strong></td>
+<td style="text-align: right;">bảng phân bố cell</td>
+<td><strong>Ba</strong> bộ cộng (16+16+10 bit); và số này đủ nhỏ để khẳng định <strong>không có mảng nhân</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>0 cell nhân, 0 macro bộ nhớ</strong></td>
+<td style="text-align: right;"><code>physical_report.md</code> §2, <code>synth_stat.txt</code></td>
+<td>✅ <strong>Xác nhận Charter mục 9</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>arrival 11,15 ns, slack −1,27 ns</strong></td>
+<td style="text-align: right;"><code>timing_report_max.txt</code></td>
+<td>🟥 <strong>KHÔNG đạt</strong> chu kỳ 10 ns giả định</td>
+<td><strong>Không</strong> phải số sau layout — sẽ còn tệ hơn</td>
+</tr>
+<tr>
+<td><strong>TNS −13,36 ns</strong></td>
+<td style="text-align: right;"><code>tns.txt</code></td>
+<td>Vi phạm <strong>có hệ thống</strong> (hàng chục đường), không phải một đường lẻ</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>8,10e-04 W, tổ hợp 59,7 %</strong></td>
+<td style="text-align: right;"><code>power_report.txt</code></td>
+<td>Đề <strong>duy nhất</strong> có tổ hợp lấn át — vì CORDIC <strong>không có vòng rỗng</strong></td>
+<td><strong>Ước lượng</strong> mặc định, <strong>không</strong> từ VCD</td>
+</tr>
+<tr>
+<td><code>$finish at 615</code></td>
+<td style="text-align: right;"><code>simulation.log</code></td>
+<td>9 chu kỳ tới <code>done</code>, 10 chu kỳ/mẫu</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="7-tra-loi-cac-cau-hoi-ky-thuat-cua-charter-muc-2">7. Trả lời các câu hỏi kỹ thuật của Charter (mục 2)</h2>
+<p><strong>Câu 1 — “CORDIC tiết kiệm bao nhiêu diện tích so với dùng bộ nhân?”</strong></p>
+<p>Trả lời trung thực: <strong>dữ liệu hiện có không ủng hộ khẳng định đó.</strong> I05 trọn vẹn là
+<strong>6655,1328 µm²</strong>; một bộ nhân tuần tự 8×8 trọn vẹn (I03) là <strong>2790,176 µm²</strong> — tức I05
+lớn hơn <strong>2,4 lần</strong>. CORDIC <strong>tránh</strong> được bộ nhân nhưng phải trả bằng <strong>77 cell MUX</strong> của
+bộ dịch biến thiên, thứ mà kiến trúc dùng bộ nhân không cần. Ở <code>N = 8</code> cán cân chưa nghiêng
+về CORDIC; nó sẽ nghiêng khi <code>N</code> lớn hơn, vì diện tích bộ nhân tăng <code>O(N²)</code> còn bộ dịch chỉ
+<code>O(N log N)</code>. ⬜ Để kết luận dứt khoát cần tổng hợp một khối sin/cos dựa trên đa thức + bộ
+nhân, cùng thư viện và cùng script — lệnh ở <code>tradeoff.md</code> §3.</p>
+<p><strong>Câu 2 — “Tám vòng lặp cho sai số bao nhiêu — lập bảng sai số?”</strong></p>
+<p>Bảng 12 góc và thống kê trên đủ 256 góc: <code>tradeoff.md</code> §4. Tóm tắt: <strong>max |Δsin| = 5</strong>,
+<strong>max |Δcos| = 4</strong> (đơn vị: mã trên thang 128, tức ≈ 3,9 % và 3,1 %); <strong>64 %</strong> số góc sai
+≤ 1 mã, <strong>84 %</strong> sai ≤ 2 mã. Nguồn chi phối <strong>không</strong> phải số vòng mà là <strong>bảng arctan bị
+làm tròn</strong> (<code>atan[6] = 1</code>, <code>atan[7] = 0</code>) — bằng chứng: ở <code>angle = 32</code>, kết quả sau vòng 6
+chính xác hơn sau vòng 8. ⚠️ Bảng này đo trên <strong>mô hình chuẩn</strong>; bảng của <strong>RTL</strong> ⬜ chưa đo.</p>
+<p><strong>Câu 3 — “Bảng arctan lưu dưới dạng hằng số tốn bao nhiêu cell?”</strong></p>
+<p>⬜ <strong>Không tách riêng được</strong> — <code>atan_const()</code> là <code>function</code> gọi trong <code>always_comb</code>, bị
+Yosys hoà tan vào MUX toán hạng của bộ cộng <code>z</code>; netlist không có ranh giới tương ứng.
+Quy trình lấy số (tách thành module riêng, tổng hợp độc lập cùng thư viện): <code>block_diagram.md</code>
+§5. Điều đã biết chắc: bảng là <strong>80 bit</strong> hằng so với <strong>4096 bit</strong> của bảng tra đầy đủ.</p>
+<h2 id="8-tra-loi-cau-phan-tich-rieng-charter-muc-9">8. Trả lời câu phân tích riêng (Charter mục 9)</h2>
+<blockquote>
+<p><em>“Xác nhận không có cell nhân nào trong báo cáo sử dụng cell, và định lượng sai số so với
+sin/cos thật ở ít nhất 8 góc.”</em></p>
+</blockquote>
+<p><strong>Phần 1 — không có cell nhân:</strong> ✅ <strong>XÁC NHẬN.</strong> Rà đủ 55 loại cell trong
+<code>06_GDSII/physical_report.md</code> §2: chỉ có cổng logic cơ bản, cổng phức hợp AOI/OAI, XOR/XNOR
+(hàm SUM), <code>maj3_1</code> ×40 (hàm carry), MUX ×77 (bộ dịch), <code>dfxtp_1</code> ×66 (thanh ghi), và cell
+đệm/cách ly. <strong>Không có</strong> cell nhân, <strong>không có</strong> DSP/MAC, và <code>synth_stat.txt</code> ghi
+<code>Number of memories: 0</code>.</p>
+<p>Bổ sung cho chặt chẽ: thư viện <code>sky130_fd_sc_hd</code> vốn <strong>không có</strong> cell nhân nào cả. Vì vậy
+lập luận mạnh hơn phải là: <em>nếu RTL có viết <code>*</code>, Yosys sẽ tổng hợp ra một </em><em>mảng nhân bằng
+standard cell</em><em>, và số <code>maj3_1</code> sẽ vọt lên hàng trăm.</em> Con số <strong>40 <code>maj3_1</code></strong> — vừa đủ cho
+ba bộ cộng 16 + 16 + 10 bit — là bằng chứng rằng điều đó <strong>không</strong> xảy ra.</p>
+<p><strong>Phần 2 — bảng sai số ở ≥ 8 góc:</strong> bảng 12 góc ở <code>tradeoff.md</code> §4.1, trong đó có 4 góc
+phần tư, 45°/135°/225°/315°, và hai góc xấp xỉ 30°/60° (<code>angle = 21</code> và <code>43</code>, vì hệ brad
+không biểu diễn chính xác hai góc này). Sai số lớn nhất trong bảng: <code>Δcos = ±4</code> tại
+<code>angle = 43</code> và <code>85</code>.</p>
+<p>⚠️ <strong>Hai sắc thái bắt buộc phải nêu khi báo cáo:</strong></p>
+<ol>
+<li>Bảng được tính trên <strong>mô hình chuẩn Python</strong>, không phải trên RTL. Hai bên <strong>không
+   bit-exact</strong>: RTL dùng <code>&gt;&gt;&gt;</code> (floor) với giá trị âm và làm tròn lên ở giá trị nửa đơn vị,
+   mô hình chuẩn dùng <code>round()</code> của Python. Chênh lệch <strong>1 mã ở 16/256 góc</strong> — nhỏ hơn dung
+   sai <code>±4</code> của testbench nên mô phỏng vẫn PASS. Bảng sai số của <strong>chính RTL</strong> ⬜ <strong>chưa đo</strong>;
+   mã testbench để lấy nó ở <code>corner_cases.md</code> §6.2.</li>
+<li>Charter mục 8 đòi <strong>30°</strong> và <strong>60°</strong>, nhưng hệ brad (256 phần/vòng) không biểu diễn được
+   hai góc đó (<code>21,33</code> và <code>42,67</code>). Đã thay bằng <code>angle = 21</code> và <code>43</code> và ghi rõ lệch này.</li>
+</ol>
+<h2 id="9-nhung-cho-sinh-vien-hay-sai-va-cach-phat-hien">9. Những chỗ sinh viên hay sai và cách phát hiện</h2>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>Sai lầm</th>
+<th>Hậu quả</th>
+<th>Phát hiện bằng bằng chứng nào</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Dùng <code>x_next</code> thay <code>x_reg</code> khi tính <code>y_next</code></td>
+<td>Thuật toán sai <strong>và</strong> hai bộ cộng nối tiếp ⟹ đường tới hạn gấp đôi</td>
+<td>Bảng sai số bung ra; STA cho chuỗi carry ≈ 26 tầng thay vì 13</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Quên bù hệ số <code>1/K₈</code> (khởi tạo <code>x = 2^14</code> thay vì <code>9949</code>)</td>
+<td>Mọi kết quả <strong>lớn hơn 1,65 lần</strong> ⟹ bão hoà hết về <code>127</code></td>
+<td>Ca <code>45°</code> cho <code>127/127</code> thay vì <code>91/90</code>; INV-6 (<code>sin²+cos² ≈ 128²</code>) vi phạm nặng</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Dùng <code>&gt;&gt;</code> thay <code>&gt;&gt;&gt;</code> cho <code>x_reg</code>, <code>y_reg</code></td>
+<td>Mất dấu ⟹ sai ở mọi góc phần tư có toạ độ âm</td>
+<td>Góc 90°–270° sai hoàn toàn</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Quên gập góc, đưa thẳng <code>angle</code> vào <code>z</code></td>
+<td>CORDIC <strong>không hội tụ</strong> ngoài <code>|z| ≲ 99,9°</code></td>
+<td>Góc &gt; 100° cho kết quả vô nghĩa</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>Tăng số vòng lặp để giảm sai số</strong> mà giữ nguyên bảng arctan</td>
+<td>Tốn chu kỳ và diện tích, sai số <strong>không</strong> giảm</td>
+<td><code>tradeoff.md</code> §4.4: ở <code>angle = 32</code>, vòng 6 chính xác hơn vòng 8</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Dùng <code>round()</code> kiểu “cộng nửa rồi <code>&gt;&gt;&gt;</code>” cho <strong>số âm</strong></td>
+<td>Lệch 1 mã xuống ở mọi giá trị âm</td>
+<td><code>angle = 0</code>: <code>y = −138</code> ⟹ RTL cho <code>−2</code>, làm tròn đúng cho <code>−1</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>Giấu bảng sai số</strong> hoặc chỉ báo cáo góc đẹp</td>
+<td>Mất điểm nặng nhất của đề</td>
+<td>Charter mục 10 nói thẳng</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Dùng so bằng (<code>===</code>) trong testbench thay vì dung sai</td>
+<td>Testbench FAIL ở mọi góc dù thiết kế đúng</td>
+<td>Bản chất CORDIC là xấp xỉ</td>
+</tr>
+<tr>
+<td>9</td>
+<td><strong>Bỏ qua slack âm</strong> vì “mô phỏng đã PASS”</td>
+<td>Mạch chạy sai trên silicon ở 100 MHz</td>
+<td><code>wns.txt</code>: <code>wns max -1.27</code>; <code>tns.txt</code>: <code>tns max -13.36</code></td>
+</tr>
+<tr>
+<td>10</td>
+<td>Không nhận ra <code>quantize</code> nằm trong vòng lặp</td>
+<td>Bỏ lỡ cách sửa rẻ nhất (0 chu kỳ, ≈ 0 diện tích)</td>
+<td>Đọc đường tới hạn: 11 cell cuối đều là logic so sánh/bão hoà</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Coi <code>count</code> chỉ là bộ đếm</td>
+<td>Bỏ qua fanout <strong>42</strong> — 13 % đường tới hạn từ <strong>một</strong> flip-flop</td>
+<td><code>timing_report_max.txt</code> dòng 12: <code>42  0.18  1.69  1.45</code></td>
+</tr>
+<tr>
+<td>12</td>
+<td>Đổi <code>angle</code> giữa chừng trong hệ thống DDS</td>
+<td>Độ lớn theo góc cũ, <strong>dấu</strong> theo góc mới</td>
+<td><code>control.md</code> §4, bẫy 2</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="10-cau-hoi-mentor-nen-dat-khi-bao-ve">10. Câu hỏi mentor nên đặt khi bảo vệ</h2>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>Câu hỏi</th>
+<th>Đáp án mong đợi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Mô phỏng PASS nhưng STA FAIL — nghĩa là sao?</td>
+<td>Mô phỏng hành vi là <strong>zero-delay</strong>, hoàn toàn mù về thời gian. Mạch <strong>đúng</strong> nhưng <strong>chậm</strong>: cần chu kỳ ≥ ≈ 11,3 ns, không phải 10 ns</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Đường tới hạn đi qua đâu, phân rã thế nào?</td>
+<td><code>count[0]</code> (fanout 42) <strong>1,45 ns</strong> → bộ dịch biến thiên <strong>0,99 ns</strong> → 13 tầng carry <strong>4,83 ns</strong> → <code>quantize_q14</code> (làm tròn + bão hoà) <strong>3,88 ns</strong> → <code>sin_out[7]</code>. Tổng <strong>11,15 ns</strong></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Vì sao một flip-flop lại ngốn 1,45 ns?</td>
+<td><code>count[0]</code> lái <strong>42</strong> đầu vào (hai bộ dịch biến thiên 16 bit + so sánh); slew <strong>1,69 ns</strong>. <code>dfxtp_1</code> là cell nhỏ nhất thư viện</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Cách sửa rẻ nhất để có slack dương?</td>
+<td>Chuyển <code>quantize_q14</code> sang <code>S_DONE</code> (trạng thái đã tồn tại và đang rảnh), áp lên <code>x_reg</code>/<code>y_reg</code> <strong>đã chốt</strong>. Ước cắt 3,88 ns, <strong>không</strong> tốn chu kỳ, <strong>không</strong> tốn diện tích đáng kể</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Sai số 8 vòng là bao nhiêu, và <strong>nguồn chi phối</strong> là gì?</td>
+<td>max <strong>5</strong> mã (<code>sin</code>) / <strong>4</strong> mã (<code>cos</code>) trên thang 128. Nguồn chi phối là <strong>bảng arctan bị làm tròn</strong> (<code>atan[7] = 0</code>), <strong>không</strong> phải số vòng. Bằng chứng: ở <code>angle = 32</code>, vòng 6 chính xác hơn vòng 8</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Tăng số vòng lên 12 thì sai số giảm bao nhiêu?</td>
+<td><strong>Gần như không giảm</strong> — <code>atan[7]</code> đã bằng 0, các mục sau cũng sẽ bằng 0. Phải tăng độ rộng <code>z</code> và bảng trước</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Chứng minh không có cell nhân nào?</td>
+<td>Rà đủ 55 loại cell trong <code>physical_report.md</code> §2: 0 cell nhân, 0 DSP, <code>Number of memories: 0</code>. Lập luận mạnh: nếu có <code>*</code>, <code>maj3_1</code> sẽ vọt lên hàng trăm thay vì <strong>40</strong></td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>X_INIT = 9949</code> là gì và vì sao?</td>
+<td><code>round(2^14 / K₈)</code> với <code>K₈ = ∏sqrt(1+2^(−2i)) ≈ 1,6467</code>. Bù trước hệ số khuếch đại của 8 vòng quay. Mô hình chuẩn tính độc lập và ra <strong>đúng 9949</strong></td>
+</tr>
+<tr>
+<td>9</td>
+<td>Vì sao <code>x</code>, <code>y</code> cần 16 bit khi đầu ra chỉ 8 bit?</td>
+<td>Mỗi vòng mất bit thấp do dịch phải; quy tắc <code>N + log₂N + 2</code> cho <code>N=8</code> ra ≈ 13 bit tối thiểu. 16 bit là lựa chọn an toàn; giá là <strong>+32 FF</strong></td>
+</tr>
+<tr>
+<td>10</td>
+<td>Vì sao I05 có 864 cell trong khi I03 chỉ 309?</td>
+<td><strong>77 cell MUX</strong> cho hai bộ dịch <strong>biến thiên</strong> (I03/I04 dịch hằng số = 0 cell) + <strong>ba</strong> bộ cộng song song thay vì một</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Vì sao công suất tổ hợp của I05 là 59,7 % trong khi I03 chỉ 7,7 %?</td>
+<td>CORDIC <strong>không có vòng rỗng</strong>: cả ba bộ cộng và cả hai bộ dịch chuyển mạch ở <strong>mọi</strong> vòng. I03 có vòng “giữ nguyên”, I04 có tới 7/8 vòng <code>NOP</code></td>
+</tr>
+<tr>
+<td>12</td>
+<td>CORDIC có thật sự tiết kiệm diện tích so với bộ nhân không?</td>
+<td>Với số liệu hiện có thì <strong>chưa chứng minh được</strong>: I05 = 6655 µm², bộ nhân tuần tự trọn vẹn (I03) = 2790 µm². CORDIC thắng ở chỗ <strong>không cần bảng tra</strong> (80 bit so với 4096 bit) và ở độ rộng bit lớn hơn</td>
+</tr>
+<tr>
+<td>13</td>
+<td>RTL và mô hình chuẩn có bit-exact không?</td>
+<td><strong>Không</strong> — lệch 1 mã ở 16/256 góc, do quy tắc làm tròn khác nhau ở giá trị âm và ở giá trị nửa đơn vị. Dung sai ±4 của testbench che mất</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="11-gioi-han-da-chung-minh-duoc-gi-chua-chung-minh-duoc-gi">11. Giới hạn: đã chứng minh được gì, chưa chứng minh được gì</h2>
+<p><strong>Đã chứng minh:</strong></p>
+<ul>
+<li>Thuật toán CORDIC 8 vòng cho <code>sin</code>/<code>cos</code> đúng trong giới hạn sai số đã công bố: max
+  <strong>5</strong> mã (<code>sin</code>), <strong>4</strong> mã (<code>cos</code>) trên thang 128 — đo trên mô hình chuẩn, đủ 256 góc.</li>
+<li>RTL đúng ở <strong>6 góc</strong> với dung sai ±4 (<code>I05 RTL TB PASS</code>).</li>
+<li>✅ <strong>Không có cell nhân nào</strong> (Charter mục 9) — rà đủ 55 loại cell, <code>Number of memories: 0</code>.</li>
+<li>Bảng hằng arctan chỉ <strong>80 bit</strong>, so với <strong>4096 bit</strong> của bảng tra đầy đủ — tỉ lệ 1 : 51.</li>
+<li>Số chu kỳ: <strong>9 tới <code>done</code>, 10 cho một mẫu</strong>, <strong>không</strong> phụ thuộc góc.</li>
+<li>🟥 <strong>Thiết kế KHÔNG đạt chu kỳ 10 ns</strong>: WNS −1,27 ns, TNS −13,36 ns, arrival 11,15 ns.</li>
+<li>Nguyên nhân slack âm được truy tới từng đoạn: <code>quantize_q14</code> trong vòng lặp (35 %),
+  chuỗi carry (43 %), <code>count[0]</code> fanout 42 (13 %), bộ dịch biến thiên (9 %).</li>
+<li>Nguồn sai số chi phối là <strong>bảng arctan bị làm tròn</strong>, không phải số vòng lặp.</li>
+<li>RTL và mô hình chuẩn <strong>không bit-exact</strong> (lệch 1 mã ở 16/256 góc) — đã truy ra nguyên
+  nhân ở hai quy tắc làm tròn khác nhau.</li>
+</ul>
+<p><strong>Chưa chứng minh:</strong></p>
+<ul>
+<li>⬜ <strong>Bảng sai số của chính RTL</strong> trên đủ 256 góc (Charter mục 9 đòi) — mới có bảng của
+  mô hình chuẩn.</li>
+<li>⬜ Ước tính “chuyển <code>quantize</code> sang <code>S_DONE</code> cho slack ≈ +2,5 ns” — suy từ phân rã độ
+  trễ, chưa chạy lại STA.</li>
+<li>⬜ Chi phí cell của <strong>riêng</strong> bảng arctan (Charter mục 2 câu 3).</li>
+<li>⬜ So sánh diện tích với khối sin/cos dựa trên bộ nhân, và với phương án bảng tra
+  (Charter mục 2 câu 1).</li>
+<li>⬜ Waveform có chú thích (Charter mục 3, thành phần 5) — chưa bật <code>$dumpvars</code>.</li>
+<li>⬜ Công suất theo hoạt động thật (VCD) — số hiện tại là ước lượng mặc định.</li>
+<li>⬜ Mô phỏng gate-level (L4) và post-layout SDF (L5) — <code>test_matrix.csv</code> ghi <code>CHUA CHAY</code>.</li>
+<li>⬜ STA sau routing — sẽ <strong>tệ hơn</strong> 11,15 ns vì thêm ký sinh dây.</li>
+<li>⬜ Nhánh <code>default</code> của FSM (<code>2'b11</code>) — chưa có ca kiểm.</li>
+<li>⬜ Bẫy “<code>angle</code> đổi giữa chừng” — chưa có ca kiểm.</li>
+<li>⬜ Lớp vỏ chân Tiny Tapeout mà Charter mục 4 yêu cầu — RTL không có <code>ui_in</code>/<code>uio_*</code>.</li>
+<li>⬛ CORDIC chế độ vector, độ chính xác cao hơn, dấu phẩy động, tape-out — Charter mục 3
+  ghi <strong>ngoài phạm vi</strong>.</li>
+</ul>
+<hr>
+<p><em>Phiên bản: v1.0 · Ngày: 2026-09-24</em></p>
+</main>
+<footer class="doc">
+  Tài liệu sinh từ <code>implementation-notes_I05.md</code>.
+  Mọi số liệu đều kèm công cụ, phiên bản và lệnh tái lập trong
+  <code>07_TRACEABILITY/evidence_index.md</code>.
+</footer>
+</div>
+<script>
+(function(){
+  var b=document.createElement('button');
+  b.className='themebtn'; b.type='button';
+  function lbl(){var t=document.documentElement.getAttribute('data-theme');
+    return t==='dark'?'Nen sang':(t==='light'?'Nen toi':'Doi nen');}
+  b.textContent=lbl();
+  try{var s=localStorage.getItem('rtl2gds-theme'); if(s)document.documentElement.setAttribute('data-theme',s);}catch(e){}
+  b.textContent=lbl();
+  b.addEventListener('click',function(){
+    var cur=document.documentElement.getAttribute('data-theme');
+    var mq=window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var next=cur?(cur==='dark'?'light':'dark'):(mq?'light':'dark');
+    document.documentElement.setAttribute('data-theme',next);
+    try{localStorage.setItem('rtl2gds-theme',next);}catch(e){}
+    b.textContent=lbl();
+  });
+  document.body.appendChild(b);
+})();
+</script>
+</body>
+</html>

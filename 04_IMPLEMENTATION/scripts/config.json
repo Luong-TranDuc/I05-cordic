@@ -1,0 +1,38 @@
+{
+  "project_id": "I05",
+  "title": "Bộ tính sin và cos bằng CORDIC 8-bit",
+  "group": "I · Số học nâng cao",
+  "difficulty": "Trung bình",
+  "circuit_type": "Tuần tự",
+  "charter_scale": "~350–480 cell · 1×1 tile hoặc 2×1",
+  "top_module": "i05_cordic_core",
+  "clock_port": "clk",
+  "has_clock": true,
+  "expected_ff_zero": false,
+  "technology": "sky130A",
+  "std_cell_library": "sky130_fd_sc_hd",
+  "liberty_corner": "tt_025C_1v80",
+  "flow": "LibreLane/OpenROAD",
+  "measured": {
+    "sim": "PASS",
+    "pyref": "PASS",
+    "synth": "PASS",
+    "sta": "PASS",
+    "cells": 864,
+    "flip_flops": 66,
+    "area_um2": 6655.1328,
+    "critical_path_ns": 11.15,
+    "startpoint": "_1655_",
+    "endpoint": "_1603_",
+    "power_total_w": "8.10e-04"
+  },
+  "not_run": [
+    "floorplan",
+    "placement",
+    "routing",
+    "drc",
+    "lvs",
+    "gds"
+  ],
+  "source_dir_origin": "I05_FINAL_MENTOR_PACKAGE_v1_0"
+}

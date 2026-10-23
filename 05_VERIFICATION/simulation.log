@@ -1,0 +1,2 @@
+I05 RTL TB PASS
+05_VERIFICATION/testbench/i05_cordic_core_tb.sv:64: $finish called at 615 (1s)

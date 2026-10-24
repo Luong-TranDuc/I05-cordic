@@ -10,14 +10,17 @@ module i05_cordic_core (
     output logic       done
 );
 
-    localparam int F = 14;
-
-    // 1/K_8 * 2^14 for the 8-iteration mentor proposal.
+    // 1/K_8 * 2^14
     localparam logic signed [15:0] X_INIT = 16'sd9949;
 
     logic signed [15:0] x_reg, y_reg;
     logic signed [15:0] x_next, y_next;
-    logic signed [9:0]  z_reg, z_next;
+
+    logic signed [15:0] x_shift1, x_shift2, x_shift4;
+    logic signed [15:0] y_shift1, y_shift2, y_shift4;
+    logic signed [15:0] x_shifted, y_shifted;
+
+    logic signed [9:0] z_reg, z_next;
     logic [3:0] count;
 
     logic sign_cos, sign_sin;
@@ -31,7 +34,9 @@ module i05_cordic_core (
 
     state_t state;
 
-    function automatic logic signed [9:0] atan_const(input logic [2:0] idx);
+    function automatic logic signed [9:0] atan_const(
+        input logic [2:0] idx
+    );
         case (idx)
             3'd0: atan_const = 10'sd32;
             3'd1: atan_const = 10'sd19;
@@ -44,17 +49,18 @@ module i05_cordic_core (
         endcase
     endfunction
 
-    function automatic signed [7:0] quantize_q14(
+    function automatic logic signed [7:0] quantize_q14(
         input logic signed [15:0] v
     );
         logic signed [31:0] scaled;
         logic signed [31:0] q;
         begin
-            // round(v / 2^14 * 128) = round(v / 2^7)
+            // Round v / 2^7, with sign extension to 32 bits.
             if (v >= 0)
-                scaled = v + 32'sd64;
+                scaled = {{16{v[15]}}, v} + 32'sd64;
             else
-                scaled = v - 32'sd64;
+                scaled = {{16{v[15]}}, v} - 32'sd64;
+
             q = scaled >>> 7;
 
             if (q > 127)
@@ -66,10 +72,27 @@ module i05_cordic_core (
         end
     endfunction
 
+    // Three-stage arithmetic right shifter: 1 bit, 2 bits, 4 bits.
+    // count[2:0] selects the total shift amount from 0 to 7.
     always_comb begin
-        z_init    = '0;
-        sign_cos  = 1'b0;
-        sign_sin  = 1'b0;
+        x_shift1 = count[0] ? (x_reg >>> 1) : x_reg;
+        y_shift1 = count[0] ? (y_reg >>> 1) : y_reg;
+
+        x_shift2 = count[1] ? (x_shift1 >>> 2) : x_shift1;
+        y_shift2 = count[1] ? (y_shift1 >>> 2) : y_shift1;
+
+        x_shift4 = count[2] ? (x_shift2 >>> 4) : x_shift2;
+        y_shift4 = count[2] ? (y_shift2 >>> 4) : y_shift2;
+
+        x_shifted = x_shift4;
+        y_shifted = y_shift4;
+    end
+
+    // Angle preprocessing and CORDIC next-state calculations.
+    always_comb begin
+        z_init   = '0;
+        sign_cos = 1'b0;
+        sign_sin = 1'b0;
 
         if (angle < 8'd64) begin
             z_init   = $signed({2'b00, angle});
@@ -90,16 +113,17 @@ module i05_cordic_core (
         end
 
         if (z_reg >= 0) begin
-            x_next = x_reg - (y_reg >>> count);
-            y_next = y_reg + (x_reg >>> count);
+            x_next = x_reg - y_shifted;
+            y_next = y_reg + x_shifted;
             z_next = z_reg - atan_const(count[2:0]);
         end else begin
-            x_next = x_reg + (y_reg >>> count);
-            y_next = y_reg - (x_reg >>> count);
+            x_next = x_reg + y_shifted;
+            y_next = y_reg - x_shifted;
             z_next = z_reg + atan_const(count[2:0]);
         end
     end
 
+    // Main FSM and sequential registers.
     always_ff @(posedge clk) begin
         if (!rst_n) begin
             x_reg   <= '0;
@@ -117,6 +141,7 @@ module i05_cordic_core (
             case (state)
                 S_IDLE: begin
                     busy <= 1'b0;
+
                     if (start) begin
                         x_reg <= X_INIT;
                         y_reg <= '0;
@@ -134,14 +159,15 @@ module i05_cordic_core (
                     z_reg <= z_next;
 
                     if (count == 4'd7) begin
-                        // sign restoration and output quantization use the
-                        // post-iteration values.
+                        // Quantize the post-iteration values.
                         cos_out <= sign_cos
-                                   ? -quantize_q14(x_next)
-                                   :  quantize_q14(x_next);
+                                 ? -quantize_q14(x_next)
+                                 :  quantize_q14(x_next);
+
                         sin_out <= sign_sin
-                                   ? -quantize_q14(y_next)
-                                   :  quantize_q14(y_next);
+                                 ? -quantize_q14(y_next)
+                                 :  quantize_q14(y_next);
+
                         busy  <= 1'b0;
                         state <= S_DONE;
                     end else begin

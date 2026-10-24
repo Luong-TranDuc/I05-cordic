@@ -1,2 +1,3 @@
+VCD info: dumpfile i05_cordic_core_tb.vcd opened for output.
 I05 RTL TB PASS
-05_VERIFICATION/testbench/i05_cordic_core_tb.sv:64: $finish called at 615 (1s)
+05_VERIFICATION/testbench/i05_cordic_core_tb.sv:68: $finish called at 615 (1s)

@@ -17,6 +17,10 @@ module i05_cordic_core_tb;
     );
 
     always #5 clk=~clk;
+initial begin
+    $dumpfile("i05_cordic_core_tb.vcd");
+    $dumpvars(0, i05_cordic_core_tb);
+end
 
     task automatic run_case(
         input [7:0] p,

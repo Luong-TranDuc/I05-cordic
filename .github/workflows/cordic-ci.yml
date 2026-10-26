@@ -1,0 +1,35 @@
+name: I05 CORDIC CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  rtl-simulation:
+    name: RTL Compile and Simulation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Icarus Verilog
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iverilog
+
+      - name: Compile RTL and testbench
+        run: |
+          mkdir -p build
+          iverilog -g2012 \
+            -s i05_cordic_core_tb \
+            -o build/cordic_tb.vvp \
+            04_IMPLEMENTATION/rtl/i05_cordic_core.sv \
+            05_VERIFICATION/testbench/i05_cordic_core_tb.sv
+
+      - name: Run RTL simulation
+        run: |
+          vvp build/cordic_tb.vvp
